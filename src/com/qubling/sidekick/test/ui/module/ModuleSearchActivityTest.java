@@ -5,22 +5,17 @@ import com.qubling.sidekick.R;
 import com.qubling.sidekick.instance.Module;
 import com.qubling.sidekick.ui.module.ModuleSearchActivity;
 import com.qubling.sidekick.ui.module.ModuleViewActivity;
+import com.qubling.sidekick.ui.module.ModuleViewFragment;
 
-import android.app.Activity;
+import android.os.Build;
+import android.support.v4.app.FragmentManager;
 import android.test.ActivityInstrumentationTestCase2;
-import android.util.Log;
-import android.widget.EditText;
-import android.widget.ImageButton;
+import android.util.DisplayMetrics;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 
 public class ModuleSearchActivityTest extends ActivityInstrumentationTestCase2<ModuleSearchActivity> {
-
-	private Activity activity;
-	private EditText textSearch; // TODO Need to support the search view in the action bar too
-	private ImageButton buttonSearch;
-	private ListView listSearchResults;
-	
+    
 	private Solo solo;
 	
 	public ModuleSearchActivityTest() {
@@ -31,76 +26,74 @@ public class ModuleSearchActivityTest extends ActivityInstrumentationTestCase2<M
 		super.setUp();
 		
 		solo = new Solo(getInstrumentation(), getActivity());
-		
-		setActivityInitialTouchMode(false);
-		
-		activity = getActivity();
-		
-		textSearch = (EditText) activity.findViewById(R.id.text_search);
-		buttonSearch = (ImageButton) activity.findViewById(R.id.button_search);
-		listSearchResults = (ListView) activity.findViewById(R.id.list_search_results);
 	}
 	
-	public void testSearchTestMore() throws Throwable {
-		runTestOnUiThread(new Runnable() {
-			
-			@Override
-			public void run() {
-				textSearch.setText("Test::More");
-				buttonSearch.performClick();
-			}
-		});
-		
-		Thread.sleep(10000);
-		
-		runTestOnUiThread(new Runnable() {
-			
-			@Override
-			public void run() {
-				assertTrue(listSearchResults.getAdapter().getCount() > 10);
-			}
-		});
+	public boolean isPhone() {
+        DisplayMetrics metrics = new DisplayMetrics();
+        getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        return metrics.widthPixels / metrics.density < 600;
+	}
+	
+	public boolean isHoneycomb() {
+	    return Build.VERSION.SDK_INT >= 11;
 	}
 	
 	public void testSearchTestMoreRobotium() throws Throwable {
-	    solo.enterText(0, "Test::More");
-	    solo.clickOnImageButton(0);
 	    
-	    Thread.sleep(10000);
-	    
-	    ListView listSearchResults = (ListView) solo.getView(R.id.list_search_results);
-	    ListAdapter searchResultsAdapter = listSearchResults.getAdapter();
-	    assertTrue(searchResultsAdapter.getCount() > 10);
-	    
-	    Module testMoreModule = null;
-	    int testMoreIndex = -1;
-	    
-	    for (int i = 0; i < searchResultsAdapter.getCount(); i++) {
-	        Object o = searchResultsAdapter.getItem(i);
-	        
-	        if (i + 1 == searchResultsAdapter.getCount()) {
-	            assertNull(o);
-	        }
-	        else {
-	            assertTrue(o instanceof Module);
-	            
-	            Module m = (Module) o;
-	            if ("Test::More".equals(m.getName())) {
-	                testMoreModule = m;
-	                testMoreIndex = i;
-	            }
-	        }
-	    }
+	    ModuleSearchActivityTestHelper helper = ModuleSearchActivityTestHelper.createInstance(solo, getInstrumentation());
+	    helper.doSearch("Test::More");
         
-	    assertTrue(testMoreIndex >= 0);
+//        Thread.sleep(10000);
+	    getInstrumentation().waitForIdleSync();
+        
+        ListView listSearchResults = (ListView) solo.getView(R.id.list_search_results);
+        ListAdapter searchResultsAdapter = listSearchResults.getAdapter();
+        assertTrue(searchResultsAdapter.getCount() > 10);
+        
+        Module testMoreModule = null;
+        int testMoreIndex = -1;
+        
+        for (int i = 0; i < searchResultsAdapter.getCount(); i++) {
+            Object o = searchResultsAdapter.getItem(i);
+            
+            if (i + 1 == searchResultsAdapter.getCount()) {
+                assertNull(o);
+            }
+            else {
+                assertTrue(o instanceof Module);
+                
+                Module m = (Module) o;
+                if ("Test::More".equals(m.getName())) {
+                    testMoreModule = m;
+                    testMoreIndex = i;
+                }
+            }
+        }
+        
+        assertTrue(testMoreIndex >= 0);
         assertNotNull(testMoreModule);
         
         solo.clickInList(testMoreIndex);
+	    
+	    if (isPhone()) {
+            
+            assertTrue(solo.waitForActivity("ModuleViewActivity", 2000));
+            
+            ModuleViewActivity moduleViewActivity = (ModuleViewActivity) solo.getCurrentActivity();
+            assertEquals(moduleViewActivity.getTitle(), "Test::More");
+            
+        }
         
-        assertTrue(solo.waitForActivity("ModuleViewActivity", 2000));
-        
-        ModuleViewActivity moduleViewActivity = (ModuleViewActivity) solo.getCurrentActivity();
-        assertEquals(moduleViewActivity.getTitle(), "Test::More");
+        else {
+             ModuleSearchActivity moduleSearchActivity = (ModuleSearchActivity) solo.getCurrentActivity();
+             
+             FragmentManager fragmentManager = moduleSearchActivity.getSupportFragmentManager();
+             ModuleViewFragment moduleViewFragment = (ModuleViewFragment) fragmentManager.findFragmentById(R.id.module_view_fragment_container);
+
+             assertNotNull(moduleViewFragment);
+             
+             assertEquals(moduleViewFragment.getModule().getName(), "Test::More");
+	    }
 	}
 
 }
